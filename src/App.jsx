@@ -26,6 +26,9 @@ function App() {
   }
 
   const extractIdFromScan = (text) => {
+    if (text.includes('startapp=')) {
+      return text.split('startapp=')[1]?.split('&')[0]
+    }
     if (text.includes('start=')) {
       return text.split('start=')[1]?.split('&')[0]
     }
@@ -124,7 +127,7 @@ function App() {
     return `${count} people trust you`
   }
 
-  const shareLink = `https://t.me/CyrusID_bot?start=${myId}`
+  const shareLink = `https://t.me/CyrusID_bot/app?startapp=${myId}`
 
   // ===== VOUCH CONFIRMATION MODAL =====
   if (pendingVouch) {
