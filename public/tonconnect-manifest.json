@@ -1,8 +1,8 @@
 {
-  "url": "https://your-app.vercel.app",
+  "url": "https://blue-id-app.vercel.app",
   "name": "Blue ID",
-  "iconUrl": "https://your-app.vercel.app/icon.png",
-  "termsOfUseUrl": "https://your-app.vercel.app/terms",
-  "privacyPolicyUrl": "https://your-app.vercel.app/privacy"
+  "iconUrl": "https://blue-id-app.vercel.app/icon.png",
+  "termsOfUseUrl": "https://blue-id-app.vercel.app/terms",
+  "privacyPolicyUrl": "https://blue-id-app.vercel.app/privacy"
 }
 

@@ -5,7 +5,7 @@ import App from './App'
 import './index.css'
 
 // Manifest for TON Connect - you'll host this on your Vercel deployment
-const manifestUrl = 'https://your-app.vercel.app/tonconnect-manifest.json'
+const manifestUrl = 'https://blue-id-app.vercel.app/tonconnect-manifest.json'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
