@@ -1,217 +1,229 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { TonConnectButton } from '@tonconnect/ui-react'
+import { Html5Qrcode } from 'html5-qrcode'
+import { addVouch, getVouchesReceived, getVouchesGiven } from './supabase'
 
 function App() {
   const [tgUser, setTgUser] = useState(null)
   const [myId, setMyId] = useState(null)
   const [vouches, setVouches] = useState(0)
   const [vouchersCount, setVouchersCount] = useState(0)
-  const [showQR, setShowQR] = useState(false)
-  const [vouchInput, setVouchInput] = useState('')
+  const [view, setView] = useState('home') // home, mycode, scan
   const [message, setMessage] = useState('')
   const [pendingVouch, setPendingVouch] = useState(null)
+  const [givenList, setGivenList] = useState([])
+  const scannerRef = useRef(null)
+
+  const loadVouchData = async (userId) => {
+    const [received, given] = await Promise.all([
+      getVouchesReceived(userId),
+      getVouchesGiven(userId)
+    ])
+    setVouches(received.count)
+    setVouchersCount(given.length)
+    setGivenList(given)
+  }
+
+  const extractIdFromScan = (text) => {
+    if (text.includes('start=')) {
+      return text.split('start=')[1]?.split('&')[0]
+    }
+    return text.trim()
+  }
+
+  const startScanner = async () => {
+    setView('scan')
+    setTimeout(async () => {
+      try {
+        const scanner = new Html5Qrcode('qr-reader')
+        scannerRef.current = scanner
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 220, height: 220 } },
+          (decodedText) => {
+            const targetId = extractIdFromScan(decodedText)
+            stopScanner()
+            if (targetId && targetId !== myId) {
+              setPendingVouch(targetId)
+              window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success')
+            } else if (targetId === myId) {
+              setMessage("That's your own code!")
+              setTimeout(() => setMessage(''), 2000)
+            }
+          },
+          () => {}
+        )
+      } catch (err) {
+        setMessage('Please allow camera access')
+        setTimeout(() => setMessage(''), 2000)
+        setView('home')
+      }
+    }, 100)
+  }
+
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().catch(() => {})
+      scannerRef.current = null
+    }
+    setView('home')
+  }
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
     if (tg) {
       tg.ready()
       tg.expand()
-      document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#0d1117')
-      document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#e6edf3')
-      
       const user = tg.initDataUnsafe?.user
       if (user) {
         setTgUser(user)
-        setMyId(String(user.id))
-        
-        // Load my vouches received
-        const saved = localStorage.getItem(`vouches_${user.id}`)
-        if (saved) {
-          const data = JSON.parse(saved)
-          setVouches(data.count || 0)
-        }
-        
-        // Load vouches I've given
-        const given = JSON.parse(localStorage.getItem(`given_${user.id}`) || '[]')
-        setVouchersCount(given.length)
-        
-        // Check if opened via vouch link
+        const id = String(user.id)
+        setMyId(id)
+        loadVouchData(id)
         const startParam = tg.initDataUnsafe?.start_param
-        if (startParam && startParam !== String(user.id)) {
+        if (startParam && startParam !== id) {
           setPendingVouch(startParam)
         }
       }
     }
-    
-    // Browser fallback
-    if (!myId) {
+    if (!window.Telegram?.WebApp?.initDataUnsafe?.user) {
       const savedId = localStorage.getItem('cyrus_browser_id') || `browser_${Date.now()}`
       localStorage.setItem('cyrus_browser_id', savedId)
       setMyId(savedId)
-      
-      const saved = localStorage.getItem(`vouches_${savedId}`)
-      if (saved) {
-        const data = JSON.parse(saved)
-        setVouches(data.count || 0)
-      }
+      loadVouchData(savedId)
     }
-  }, [myId])
+  }, [])
 
-  const confirmVouch = () => {
+  const confirmVouch = async () => {
     if (!pendingVouch || pendingVouch === myId) return
-    
-    // Check if already vouched for this person
-    const given = JSON.parse(localStorage.getItem(`given_${myId}`) || '[]')
-    if (given.includes(pendingVouch)) {
-      setMessage('Already vouched for this person')
+    if (givenList.includes(pendingVouch)) {
+      setMessage('You already trust this person')
       setPendingVouch(null)
+      setTimeout(() => setMessage(''), 2000)
       return
     }
-    
-    // Record that I vouched for them
-    given.push(pendingVouch)
-    localStorage.setItem(`given_${myId}`, JSON.stringify(given))
-    setVouchersCount(given.length)
-    
-    // Increment their vouch count
-    const theirData = JSON.parse(localStorage.getItem(`vouches_${pendingVouch}`) || '{"count":0,"from":[]}')
-    theirData.count += 1
-    theirData.from.push(myId)
-    localStorage.setItem(`vouches_${pendingVouch}`, JSON.stringify(theirData))
-    
-    setMessage(`✓ Vouched! They now have ${theirData.count} vouches`)
+    const { error } = await addVouch(myId, pendingVouch)
+    if (error) {
+      setMessage(error === 'Already vouched' ? 'Already trusted' : 'Something went wrong')
+      setPendingVouch(null)
+      setTimeout(() => setMessage(''), 2000)
+      return
+    }
+    setGivenList([...givenList, pendingVouch])
+    setVouchersCount(vouchersCount + 1)
+    setMessage('✓ Done!')
     setPendingVouch(null)
     window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success')
+    setTimeout(() => setMessage(''), 2000)
   }
 
-  const handleManualVouch = () => {
-    if (!vouchInput.trim()) return
-    
-    let targetId = vouchInput.trim()
-    // Extract ID from link
-    if (targetId.includes('start=')) {
-      targetId = targetId.split('start=')[1]?.split('&')[0]
-    }
-    
-    if (targetId === myId) {
-      setMessage("Can't vouch for yourself")
-      return
-    }
-    
-    const given = JSON.parse(localStorage.getItem(`given_${myId}`) || '[]')
-    if (given.includes(targetId)) {
-      setMessage('Already vouched for this person')
-      setVouchInput('')
-      return
-    }
-    
-    given.push(targetId)
-    localStorage.setItem(`given_${myId}`, JSON.stringify(given))
-    setVouchersCount(given.length)
-    
-    const theirData = JSON.parse(localStorage.getItem(`vouches_${targetId}`) || '{"count":0,"from":[]}')
-    theirData.count += 1
-    theirData.from.push(myId)
-    localStorage.setItem(`vouches_${targetId}`, JSON.stringify(theirData))
-    
-    setMessage(`✓ Vouched for ${targetId.slice(0, 8)}...`)
-    setVouchInput('')
-    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium')
+  const getTrustLabel = (count) => {
+    if (count === 0) return "No one yet"
+    if (count === 1) return "1 person trusts you"
+    return `${count} people trust you`
   }
 
-  const getTrustLevel = (count) => {
-    if (count >= 10) return { label: 'VERIFIED HUMAN', color: '#3fb950', icon: '✓' }
-    if (count >= 5) return { label: 'TRUSTED', color: '#58a6ff', icon: '◈' }
-    if (count >= 1) return { label: 'KNOWN', color: '#d29922', icon: '○' }
-    return { label: 'UNVERIFIED', color: '#8b949e', icon: '?' }
-  }
-
-  const trust = getTrustLevel(vouches)
   const shareLink = `https://t.me/CyrusID_bot?start=${myId}`
 
+  // ===== VOUCH CONFIRMATION MODAL =====
+  if (pendingVouch) {
+    return (
+      <div className="app">
+        <div className="modal-card">
+          <div className="modal-icon">🤝</div>
+          <h2 className="modal-title">Trust this person?</h2>
+          <p className="modal-subtitle">
+            You're confirming you know them in real life
+          </p>
+          <button className="big-btn green" onClick={confirmVouch}>
+            Yes, I trust them
+          </button>
+          <button className="big-btn ghost" onClick={() => setPendingVouch(null)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ===== SHOW MY QR CODE =====
+  if (view === 'mycode') {
+    return (
+      <div className="app">
+        <button className="back-btn" onClick={() => setView('home')}>← Back</button>
+        <div className="qr-card">
+          <QRCodeSVG 
+            value={shareLink}
+            size={200}
+            bgColor="#ffffff"
+            fgColor="#1a1a2e"
+            level="M"
+          />
+        </div>
+        <p className="qr-instruction">Show this to a friend</p>
+        <p className="qr-hint">They scan it to say they trust you</p>
+        <button 
+          className="big-btn outline"
+          onClick={() => {
+            navigator.clipboard.writeText(shareLink)
+            setMessage('✓ Link copied!')
+            setTimeout(() => setMessage(''), 2000)
+          }}
+        >
+          📋 Copy link instead
+        </button>
+        {message && <div className="toast">{message}</div>}
+      </div>
+    )
+  }
+
+  // ===== SCANNER VIEW =====
+  if (view === 'scan') {
+    return (
+      <div className="app">
+        <button className="back-btn" onClick={stopScanner}>← Back</button>
+        <p className="scan-instruction">Point at their code</p>
+        <div className="scanner-frame">
+          <div id="qr-reader"></div>
+        </div>
+        <p className="scan-hint">Scanning automatically...</p>
+        {message && <div className="toast">{message}</div>}
+      </div>
+    )
+  }
+
+  // ===== HOME VIEW =====
   return (
     <div className="app">
-      <div className="logo">☀</div>
-      <h1 className="title">Cyrus</h1>
-      <p className="subtitle">Web of Trust</p>
-
-      {/* Pending vouch confirmation */}
-      {pendingVouch && (
-        <div className="vouch-confirm">
-          <p>Vouch for user <strong>{pendingVouch.slice(0, 10)}...</strong>?</p>
-          <p className="vouch-hint">This confirms they are a real person you know</p>
-          <div className="vouch-actions">
-            <button className="btn primary" onClick={confirmVouch}>✓ Yes, Vouch</button>
-            <button className="btn secondary" onClick={() => setPendingVouch(null)}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {message && <div className="message">{message}</div>}
-
-      {/* Trust Score */}
-      <div className="trust-card" style={{ borderColor: trust.color }}>
-        <div className="trust-score">
-          <span className="trust-number">{vouches}</span>
-          <span className="trust-unit">vouches</span>
-        </div>
-        <span className="trust-label" style={{ color: trust.color }}>
-          {trust.icon} {trust.label}
-        </span>
-        <span className="trust-given">{vouchersCount} given</span>
-      </div>
-
-      {/* My QR Code */}
-      <div className="section">
-        <button className="btn secondary" onClick={() => setShowQR(!showQR)}>
-          {showQR ? 'Hide QR' : '📱 My Vouch Code'}
-        </button>
-        
-        {showQR && (
-          <div className="qr-container">
-            <QRCodeSVG 
-              value={shareLink}
-              size={160}
-              bgColor="#0d1117"
-              fgColor="#e6edf3"
-            />
-            <p className="qr-hint">Others scan to vouch for you</p>
-            <button 
-              className="btn small"
-              onClick={() => {
-                navigator.clipboard.writeText(shareLink)
-                setMessage('✓ Link copied!')
-              }}
-            >
-              📋 Copy Link
-            </button>
-          </div>
+      <div className="hero">
+        <div className="trust-number">{vouches}</div>
+        <div className="trust-label">{getTrustLabel(vouches)}</div>
+        {vouchersCount > 0 && (
+          <div className="trust-given">You trust {vouchersCount} {vouchersCount === 1 ? 'person' : 'people'}</div>
         )}
       </div>
 
-      {/* Vouch for someone */}
-      <div className="section">
-        <p className="section-title">Vouch for Someone</p>
-        <input
-          type="text"
-          className="input"
-          placeholder="Paste their link or ID"
-          value={vouchInput}
-          onChange={(e) => setVouchInput(e.target.value)}
-        />
-        <button className="btn primary" onClick={handleManualVouch}>
-          ✓ Vouch
+      <div className="actions">
+        <button className="big-btn green" onClick={() => setView('mycode')}>
+          <span className="btn-icon">📱</span>
+          <span className="btn-text">Show My Code</span>
+          <span className="btn-hint">Get trusted by friends</span>
+        </button>
+
+        <button className="big-btn blue" onClick={startScanner}>
+          <span className="btn-icon">📷</span>
+          <span className="btn-text">Scan to Trust</span>
+          <span className="btn-hint">Trust someone you know</span>
         </button>
       </div>
 
-      <div className="wallet-section">
-        <TonConnectButton />
-      </div>
+      {message && <div className="toast">{message}</div>}
 
-      {tgUser && (
-        <p className="user-info">{tgUser.first_name} • {myId}</p>
-      )}
+      <div className="footer">
+        <TonConnectButton />
+        {tgUser && <p className="user-name">Hi, {tgUser.first_name}!</p>}
+      </div>
     </div>
   )
 }

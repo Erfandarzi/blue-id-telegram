@@ -1,40 +1,72 @@
-# Blue ID - Telegram Mini App
+# Cyrus — Web of Trust Identity
 
-A minimal Telegram Mini App for claiming Soulbound Identity Tokens on TON blockchain.
+A Telegram Mini App for building sybil-resistant identity through real-world vouching.
+
+## How It Works
+
+1. **Show your QR code** to someone you know in person
+2. **They scan it** to vouch that you're a real human
+3. **Your trust score** = number of people who vouch for you
+
+No passwords. No KYC. Just humans vouching for humans.
+
+## Use Cases
+
+- **VPNs/Proxies**: Only allow verified humans to prevent bot abuse
+- **Online communities**: Filter trolls and fake accounts
+- **Coordination tools**: Ensure participants are real people
 
 ## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Run locally
 npm run dev
 ```
 
-## Deploy to Vercel
+## Deploy
 
-1. Push this folder to GitHub
-2. Go to [vercel.com](https://vercel.com) → Import your repo
-3. Deploy (no config needed)
-4. Copy your Vercel URL
+1. Fork this repo
+2. Create a [Supabase](https://supabase.com) project with a `vouches` table:
+   ```sql
+   create table vouches (
+     id uuid default gen_random_uuid() primary key,
+     from_id text not null,
+     to_id text not null,
+     created_at timestamp default now(),
+     unique(from_id, to_id)
+   );
+   ```
+3. Deploy to [Vercel](https://vercel.com) with env vars:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+4. Create a Telegram bot via [@BotFather](https://t.me/BotFather) and set the Mini App URL
 
-## Setup Telegram Bot
+## API
 
-1. Open Telegram → message `@BotFather`
-2. Send `/newbot` and follow prompts
-3. Send `/newapp` → select your bot
-4. Paste your Vercel URL as the Web App URL
+Verify a user's trust level:
 
-## Update Manifest
+```
+GET /api/verify?id=<telegram_user_id>
 
-After deploying, update these files with your actual Vercel URL:
-- `src/main.jsx` - line 7 (manifestUrl)
-- `public/tonconnect-manifest.json` - url field
+Response:
+{
+  "id": "123456",
+  "vouch_count": 7,
+  "trust_level": "TRUSTED",
+  "verified": true
+}
+```
 
-## Next Steps
+Trust levels: `UNVERIFIED` (0) → `KNOWN` (1+) → `TRUSTED` (5+) → `VERIFIED_HUMAN` (10+)
 
-- Add real SBT minting (see TON docs for contract)
-- Add backend verification
-- Configure USDT airdrops for holders
+## Stack
+
+- React + Vite
+- Telegram Mini App SDK
+- TON Connect (wallet integration)
+- Supabase (database)
+
+## License
+
+MIT
 
