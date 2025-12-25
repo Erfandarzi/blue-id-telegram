@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@0xpolygonid/js-sdk": "^1.38.6",
     "@tonconnect/ui-react": "^2.0.6",
     "qrcode.react": "^4.2.0",
     "react": "^18.2.0",

@@ -11,6 +11,7 @@
   --accent-dim: rgba(240, 136, 62, 0.15);
   --border: #30363d;
   --surface: #161b22;
+  --green: #3fb950;
 }
 
 body {
@@ -32,77 +33,86 @@ body {
 }
 
 .logo {
-  font-size: 3.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.title {
-  font-size: 2.2rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 3rem;
   margin-bottom: 0.25rem;
 }
 
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
 .subtitle {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   opacity: 0.5;
   margin-bottom: 1.5rem;
-}
-
-.trust-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1.2rem 2rem;
-  border: 2px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-  margin-bottom: 1.5rem;
-}
-
-.trust-count {
-  font-size: 2.5rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.trust-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 0.3rem;
 }
 
 .message {
   padding: 0.6rem 1rem;
   background: var(--accent-dim);
   border-radius: 8px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   margin-bottom: 1rem;
   color: var(--accent);
 }
 
+.did-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.2rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 300px;
+}
+
+.did-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.5;
+  margin-bottom: 0.5rem;
+}
+
+.did-value {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: none;
+  word-break: break-all;
+}
+
+.did-status {
+  font-size: 0.75rem;
+  color: var(--green);
+  margin-top: 0.5rem;
+}
+
 .section {
   width: 100%;
-  max-width: 320px;
-  margin-bottom: 1.5rem;
+  max-width: 300px;
+  margin-bottom: 1.2rem;
 }
 
 .section-title {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   opacity: 0.5;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
 
 .btn {
   width: 100%;
-  padding: 0.9rem 1.5rem;
+  padding: 0.85rem 1.2rem;
   border: none;
   border-radius: 10px;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
@@ -117,59 +127,86 @@ body {
   filter: brightness(1.1);
 }
 
+.btn.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .btn.secondary {
   background: var(--surface);
   color: var(--tg-theme-text-color);
   border: 1px solid var(--border);
-  margin-top: 0.75rem;
+}
+
+.cred-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn.cred {
+  flex: 1;
+  padding: 0.7rem 0.5rem;
+  font-size: 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--tg-theme-text-color);
+}
+
+.btn.cred:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .qr-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem;
-  margin-top: 1rem;
+  padding: 1.2rem;
+  margin-top: 0.75rem;
   background: var(--surface);
-  border-radius: 16px;
+  border-radius: 12px;
   border: 1px solid var(--border);
 }
 
 .qr-hint {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   opacity: 0.5;
-  margin-top: 1rem;
-  text-align: center;
+  margin-top: 0.75rem;
 }
 
-.input {
-  width: 100%;
-  padding: 0.85rem 1rem;
+.creds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cred-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--tg-theme-text-color);
-  font-size: 0.95rem;
-  margin-bottom: 0.75rem;
-  outline: none;
+  border-radius: 8px;
 }
 
-.input:focus {
-  border-color: var(--accent);
+.cred-type {
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
-.input::placeholder {
-  color: #484f58;
+.cred-check {
+  color: var(--green);
+  font-size: 0.9rem;
 }
 
 .wallet-section {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+  margin-top: auto;
+  padding-top: 1rem;
 }
 
 .user-info {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   opacity: 0.4;
-  margin-top: auto;
-  padding-top: 1rem;
+  margin-top: 0.5rem;
 }
