@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { TonConnectButton } from '@tonconnect/ui-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { addVouch, getVouchesReceived, getVouchesGiven } from './supabase'
 
@@ -136,12 +135,12 @@ function App() {
       <div className="app">
         <div className="modal-card">
           <div className="modal-icon">🤝</div>
-          <h2 className="modal-title">Trust this person?</h2>
+          <h2 className="modal-title">Know this person?</h2>
           <p className="modal-subtitle">
-            You're confirming you know them in real life
+            Confirm you've met them in real life
           </p>
           <button className="big-btn green" onClick={confirmVouch}>
-            Yes, I trust them
+            Yes, I know them
           </button>
           <button className="big-btn ghost" onClick={() => setPendingVouch(null)}>
             Cancel
@@ -240,9 +239,11 @@ function App() {
         <div className="trust-number">{vouches}</div>
         <div className="trust-label">{getTrustLabel(vouches)}</div>
         {vouchersCount > 0 && (
-          <div className="trust-given">You trust {vouchersCount} {vouchersCount === 1 ? 'person' : 'people'}</div>
+          <div className="trust-given">You know {vouchersCount} {vouchersCount === 1 ? 'person' : 'people'}</div>
         )}
       </div>
+
+      <p className="tagline">Verify you know real people</p>
 
       <div className="actions">
         <button className="big-btn green" onClick={() => setView('mycode')}>
@@ -265,7 +266,6 @@ function App() {
       {message && <div className="toast">{message}</div>}
 
       <div className="footer">
-        <TonConnectButton />
         {tgUser && <p className="user-name">Hi, {tgUser.first_name}!</p>}
       </div>
     </div>

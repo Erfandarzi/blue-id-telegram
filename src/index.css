@@ -64,6 +64,13 @@ body {
   margin-top: 0.75rem;
 }
 
+.tagline {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
 /* ===== BIG ACTION BUTTONS ===== */
 .actions {
   width: 100%;
