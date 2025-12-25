@@ -5,23 +5,41 @@ function App() {
   const [tgUser, setTgUser] = useState(null)
   const [claimed, setClaimed] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [points, setPoints] = useState(0)
+  const [referralLink, setReferralLink] = useState('')
+  const [copied, setCopied] = useState(false)
   const wallet = useTonWallet()
   const [tonConnectUI] = useTonConnectUI()
 
   useEffect(() => {
-    // Initialize Telegram Web App
     const tg = window.Telegram?.WebApp
     if (tg) {
       tg.ready()
       tg.expand()
       
-      // Apply Telegram theme
       document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#1a1a2e')
       document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#eaeaea')
       
-      // Get user info
-      if (tg.initDataUnsafe?.user) {
-        setTgUser(tg.initDataUnsafe.user)
+      const user = tg.initDataUnsafe?.user
+      if (user) {
+        setTgUser(user)
+        setReferralLink(`https://t.me/BlueID_bot?start=${user.id}`)
+        
+        // Load points from localStorage
+        const savedPoints = localStorage.getItem(`points_${user.id}`)
+        if (savedPoints) setPoints(parseInt(savedPoints))
+        
+        // Check if came from referral
+        const startParam = tg.initDataUnsafe?.start_param
+        if (startParam && startParam !== String(user.id)) {
+          const alreadyReferred = localStorage.getItem(`referred_${user.id}`)
+          if (!alreadyReferred) {
+            // Credit referrer +10 points
+            const referrerPoints = parseInt(localStorage.getItem(`points_${startParam}`) || '0')
+            localStorage.setItem(`points_${startParam}`, referrerPoints + 10)
+            localStorage.setItem(`referred_${user.id}`, startParam)
+          }
+        }
       }
     }
   }, [])
@@ -75,9 +93,26 @@ function App() {
       )}
 
       {tgUser && (
-        <p className="user-info">
-          Welcome, {tgUser.first_name}
-        </p>
+        <>
+          <p className="user-info">
+            Welcome, {tgUser.first_name} • <strong>{points} Points</strong>
+          </p>
+          
+          <div className="referral-box">
+            <p className="referral-label">Invite friends, earn 10 points each</p>
+            <button 
+              className="share-btn"
+              onClick={() => {
+                navigator.clipboard.writeText(referralLink)
+                setCopied(true)
+                window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light')
+                setTimeout(() => setCopied(false), 2000)
+              }}
+            >
+              {copied ? '✓ Copied!' : '📋 Copy Referral Link'}
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
