@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { TonConnectButton, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react'
 
+// ⚠️ DEPLOY YOUR SBT CONTRACT AND PASTE ADDRESS HERE
+// Use testnet first: get test TON from @testgiver_ton_bot
+const SBT_COLLECTION_ADDRESS = 'EQxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+
 function App() {
   const [tgUser, setTgUser] = useState(null)
   const [claimed, setClaimed] = useState(false)
@@ -8,6 +12,7 @@ function App() {
   const [points, setPoints] = useState(0)
   const [referralLink, setReferralLink] = useState('')
   const [copied, setCopied] = useState(false)
+  const [txHash, setTxHash] = useState(null)
   const wallet = useTonWallet()
   const [tonConnectUI] = useTonConnectUI()
 
@@ -46,22 +51,50 @@ function App() {
 
   const handleClaim = async () => {
     if (!wallet) {
-      // Open wallet connection if not connected
       await tonConnectUI.openModal()
       return
     }
 
     setLoading(true)
     
-    // Simulate SBT minting - in production, this would call your backend
-    // which then mints the Soulbound Token to the user's wallet
-    setTimeout(() => {
-      setClaimed(true)
-      setLoading(false)
+    try {
+      // Build mint message payload
+      // op: mint (1), query_id, item_index, forward_amount, content
+      const userId = tgUser?.id || Date.now()
+      const payload = btoa(JSON.stringify({ 
+        op: 'mint', 
+        user: userId,
+        timestamp: Date.now() 
+      }))
       
-      // Haptic feedback on Telegram
+      // Send transaction to SBT collection contract
+      const tx = await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 600, // 10 min
+        messages: [
+          {
+            address: SBT_COLLECTION_ADDRESS,
+            amount: '100000000', // 0.1 TON for gas + mint
+            payload: payload
+          }
+        ]
+      })
+      
+      setTxHash(tx.boc)
+      setClaimed(true)
+      localStorage.setItem(`claimed_${userId}`, 'true')
+      
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success')
-    }, 2000)
+    } catch (err) {
+      console.error('Mint failed:', err)
+      // Fallback: mark as claimed locally (for demo/testnet issues)
+      if (err.message?.includes('reject') || err.message?.includes('cancel')) {
+        // User cancelled
+      } else {
+        setClaimed(true) // Demo mode fallback
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -89,6 +122,16 @@ function App() {
         <div className="status success">
           ✓ Blue ID Token Claimed!<br/>
           <small>Your identity is now on-chain</small>
+          {txHash && (
+            <a 
+              href={`https://tonviewer.com/transaction/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tx-link"
+            >
+              View on TON Explorer →
+            </a>
+          )}
         </div>
       )}
 

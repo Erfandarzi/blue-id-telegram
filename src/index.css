@@ -157,3 +157,15 @@ body {
   background: rgba(0, 136, 204, 0.3);
 }
 
+.tx-link {
+  display: block;
+  margin-top: 0.8rem;
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.tx-link:hover {
+  text-decoration: underline;
+}
+
