@@ -2,16 +2,15 @@ import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { TonConnectButton } from '@tonconnect/ui-react'
 
-// Privado ID will be initialized dynamically (heavy SDK)
-let privadoSDK = null
-
 function App() {
   const [tgUser, setTgUser] = useState(null)
-  const [did, setDid] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [status, setStatus] = useState('')
-  const [credentials, setCredentials] = useState([])
+  const [myId, setMyId] = useState(null)
+  const [vouches, setVouches] = useState(0)
+  const [vouchersCount, setVouchersCount] = useState(0)
   const [showQR, setShowQR] = useState(false)
+  const [vouchInput, setVouchInput] = useState('')
+  const [message, setMessage] = useState('')
+  const [pendingVouch, setPendingVouch] = useState(null)
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp
@@ -20,172 +19,198 @@ function App() {
       tg.expand()
       document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#0d1117')
       document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#e6edf3')
-      if (tg.initDataUnsafe?.user) {
-        setTgUser(tg.initDataUnsafe.user)
+      
+      const user = tg.initDataUnsafe?.user
+      if (user) {
+        setTgUser(user)
+        setMyId(String(user.id))
+        
+        // Load my vouches received
+        const saved = localStorage.getItem(`vouches_${user.id}`)
+        if (saved) {
+          const data = JSON.parse(saved)
+          setVouches(data.count || 0)
+        }
+        
+        // Load vouches I've given
+        const given = JSON.parse(localStorage.getItem(`given_${user.id}`) || '[]')
+        setVouchersCount(given.length)
+        
+        // Check if opened via vouch link
+        const startParam = tg.initDataUnsafe?.start_param
+        if (startParam && startParam !== String(user.id)) {
+          setPendingVouch(startParam)
+        }
       }
     }
-
-    // Check for saved identity
-    const savedDid = localStorage.getItem('cyrus_did')
-    if (savedDid) {
-      setDid(savedDid)
-      const savedCreds = JSON.parse(localStorage.getItem('cyrus_credentials') || '[]')
-      setCredentials(savedCreds)
-    }
-  }, [])
-
-  const createIdentity = async () => {
-    setLoading(true)
-    setStatus('Creating identity...')
-
-    try {
-      // Generate a DID-like identifier (simplified for MVP)
-      // Full Privado ID integration requires backend circuits
-      const userId = tgUser?.id || Date.now()
-      const randomBytes = crypto.getRandomValues(new Uint8Array(16))
-      const hex = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')
+    
+    // Browser fallback
+    if (!myId) {
+      const savedId = localStorage.getItem('cyrus_browser_id') || `browser_${Date.now()}`
+      localStorage.setItem('cyrus_browser_id', savedId)
+      setMyId(savedId)
       
-      const newDid = `did:cyrus:${hex}`
-      
-      setDid(newDid)
-      localStorage.setItem('cyrus_did', newDid)
-      localStorage.setItem('cyrus_user_id', String(userId))
-      
-      setStatus('✓ Identity created!')
-      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success')
-    } catch (err) {
-      console.error(err)
-      setStatus('Error creating identity')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const requestCredential = async (type) => {
-    setLoading(true)
-    setStatus(`Requesting ${type} credential...`)
-
-    try {
-      // Simulate credential issuance (real: would call issuer API)
-      await new Promise(r => setTimeout(r, 1500))
-      
-      const credential = {
-        id: `cred_${Date.now()}`,
-        type,
-        issuedAt: new Date().toISOString(),
-        issuer: 'did:cyrus:issuer',
-        holder: did,
-        verified: true
+      const saved = localStorage.getItem(`vouches_${savedId}`)
+      if (saved) {
+        const data = JSON.parse(saved)
+        setVouches(data.count || 0)
       }
-
-      const newCreds = [...credentials, credential]
-      setCredentials(newCreds)
-      localStorage.setItem('cyrus_credentials', JSON.stringify(newCreds))
-      
-      setStatus(`✓ ${type} credential issued!`)
-      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success')
-    } catch (err) {
-      setStatus('Error requesting credential')
-    } finally {
-      setLoading(false)
     }
+  }, [myId])
+
+  const confirmVouch = () => {
+    if (!pendingVouch || pendingVouch === myId) return
+    
+    // Check if already vouched for this person
+    const given = JSON.parse(localStorage.getItem(`given_${myId}`) || '[]')
+    if (given.includes(pendingVouch)) {
+      setMessage('Already vouched for this person')
+      setPendingVouch(null)
+      return
+    }
+    
+    // Record that I vouched for them
+    given.push(pendingVouch)
+    localStorage.setItem(`given_${myId}`, JSON.stringify(given))
+    setVouchersCount(given.length)
+    
+    // Increment their vouch count
+    const theirData = JSON.parse(localStorage.getItem(`vouches_${pendingVouch}`) || '{"count":0,"from":[]}')
+    theirData.count += 1
+    theirData.from.push(myId)
+    localStorage.setItem(`vouches_${pendingVouch}`, JSON.stringify(theirData))
+    
+    setMessage(`✓ Vouched! They now have ${theirData.count} vouches`)
+    setPendingVouch(null)
+    window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred('success')
   }
 
-  const shareLink = did ? `https://t.me/CyrusID_bot?start=verify_${did.split(':')[2]}` : ''
+  const handleManualVouch = () => {
+    if (!vouchInput.trim()) return
+    
+    let targetId = vouchInput.trim()
+    // Extract ID from link
+    if (targetId.includes('start=')) {
+      targetId = targetId.split('start=')[1]?.split('&')[0]
+    }
+    
+    if (targetId === myId) {
+      setMessage("Can't vouch for yourself")
+      return
+    }
+    
+    const given = JSON.parse(localStorage.getItem(`given_${myId}`) || '[]')
+    if (given.includes(targetId)) {
+      setMessage('Already vouched for this person')
+      setVouchInput('')
+      return
+    }
+    
+    given.push(targetId)
+    localStorage.setItem(`given_${myId}`, JSON.stringify(given))
+    setVouchersCount(given.length)
+    
+    const theirData = JSON.parse(localStorage.getItem(`vouches_${targetId}`) || '{"count":0,"from":[]}')
+    theirData.count += 1
+    theirData.from.push(myId)
+    localStorage.setItem(`vouches_${targetId}`, JSON.stringify(theirData))
+    
+    setMessage(`✓ Vouched for ${targetId.slice(0, 8)}...`)
+    setVouchInput('')
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('medium')
+  }
+
+  const getTrustLevel = (count) => {
+    if (count >= 10) return { label: 'VERIFIED HUMAN', color: '#3fb950', icon: '✓' }
+    if (count >= 5) return { label: 'TRUSTED', color: '#58a6ff', icon: '◈' }
+    if (count >= 1) return { label: 'KNOWN', color: '#d29922', icon: '○' }
+    return { label: 'UNVERIFIED', color: '#8b949e', icon: '?' }
+  }
+
+  const trust = getTrustLevel(vouches)
+  const shareLink = `https://t.me/CyrusID_bot?start=${myId}`
 
   return (
     <div className="app">
       <div className="logo">☀</div>
       <h1 className="title">Cyrus</h1>
-      <p className="subtitle">Zero-Knowledge Identity</p>
+      <p className="subtitle">Web of Trust</p>
 
-      {status && <div className="message">{status}</div>}
-
-      {!did ? (
-        <button 
-          className="btn primary" 
-          onClick={createIdentity}
-          disabled={loading}
-        >
-          {loading ? 'Creating...' : '🔐 Create My Identity'}
-        </button>
-      ) : (
-        <>
-          <div className="did-card">
-            <span className="did-label">Your DID</span>
-            <code className="did-value">{did.slice(0, 20)}...{did.slice(-8)}</code>
-            <span className="did-status">
-              {credentials.length} credential{credentials.length !== 1 ? 's' : ''}
-            </span>
+      {/* Pending vouch confirmation */}
+      {pendingVouch && (
+        <div className="vouch-confirm">
+          <p>Vouch for user <strong>{pendingVouch.slice(0, 10)}...</strong>?</p>
+          <p className="vouch-hint">This confirms they are a real person you know</p>
+          <div className="vouch-actions">
+            <button className="btn primary" onClick={confirmVouch}>✓ Yes, Vouch</button>
+            <button className="btn secondary" onClick={() => setPendingVouch(null)}>Cancel</button>
           </div>
-
-          <div className="section">
-            <button className="btn secondary" onClick={() => setShowQR(!showQR)}>
-              {showQR ? 'Hide QR' : '📱 Show Verification QR'}
-            </button>
-            
-            {showQR && (
-              <div className="qr-container">
-                <QRCodeSVG 
-                  value={shareLink}
-                  size={160}
-                  bgColor="#0d1117"
-                  fgColor="#e6edf3"
-                />
-                <p className="qr-hint">Scan to verify this identity</p>
-              </div>
-            )}
-          </div>
-
-          <div className="section">
-            <p className="section-title">Request Credentials</p>
-            <div className="cred-buttons">
-              <button 
-                className="btn cred" 
-                onClick={() => requestCredential('Human')}
-                disabled={loading || credentials.some(c => c.type === 'Human')}
-              >
-                👤 Human
-              </button>
-              <button 
-                className="btn cred" 
-                onClick={() => requestCredential('Activist')}
-                disabled={loading || credentials.some(c => c.type === 'Activist')}
-              >
-                ✊ Activist
-              </button>
-              <button 
-                className="btn cred" 
-                onClick={() => requestCredential('Diaspora')}
-                disabled={loading || credentials.some(c => c.type === 'Diaspora')}
-              >
-                🌍 Diaspora
-              </button>
-            </div>
-          </div>
-
-          {credentials.length > 0 && (
-            <div className="section">
-              <p className="section-title">My Credentials</p>
-              <div className="creds-list">
-                {credentials.map(c => (
-                  <div key={c.id} className="cred-item">
-                    <span className="cred-type">{c.type}</span>
-                    <span className="cred-check">✓</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
+
+      {message && <div className="message">{message}</div>}
+
+      {/* Trust Score */}
+      <div className="trust-card" style={{ borderColor: trust.color }}>
+        <div className="trust-score">
+          <span className="trust-number">{vouches}</span>
+          <span className="trust-unit">vouches</span>
+        </div>
+        <span className="trust-label" style={{ color: trust.color }}>
+          {trust.icon} {trust.label}
+        </span>
+        <span className="trust-given">{vouchersCount} given</span>
+      </div>
+
+      {/* My QR Code */}
+      <div className="section">
+        <button className="btn secondary" onClick={() => setShowQR(!showQR)}>
+          {showQR ? 'Hide QR' : '📱 My Vouch Code'}
+        </button>
+        
+        {showQR && (
+          <div className="qr-container">
+            <QRCodeSVG 
+              value={shareLink}
+              size={160}
+              bgColor="#0d1117"
+              fgColor="#e6edf3"
+            />
+            <p className="qr-hint">Others scan to vouch for you</p>
+            <button 
+              className="btn small"
+              onClick={() => {
+                navigator.clipboard.writeText(shareLink)
+                setMessage('✓ Link copied!')
+              }}
+            >
+              📋 Copy Link
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Vouch for someone */}
+      <div className="section">
+        <p className="section-title">Vouch for Someone</p>
+        <input
+          type="text"
+          className="input"
+          placeholder="Paste their link or ID"
+          value={vouchInput}
+          onChange={(e) => setVouchInput(e.target.value)}
+        />
+        <button className="btn primary" onClick={handleManualVouch}>
+          ✓ Vouch
+        </button>
+      </div>
 
       <div className="wallet-section">
         <TonConnectButton />
       </div>
 
       {tgUser && (
-        <p className="user-info">{tgUser.first_name}</p>
+        <p className="user-info">{tgUser.first_name} • {myId}</p>
       )}
     </div>
   )
