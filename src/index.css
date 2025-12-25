@@ -284,3 +284,40 @@ body {
   font-size: 0.85rem;
   color: var(--text-dim);
 }
+
+/* ===== PASTE LINK ===== */
+.paste-link {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin-top: 1.5rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.paste-link:hover {
+  color: var(--text);
+}
+
+.paste-input {
+  width: 100%;
+  max-width: 280px;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 2px solid rgba(255,255,255,0.15);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1rem;
+  margin-top: 1.5rem;
+  outline: none;
+}
+
+.paste-input:focus {
+  border-color: var(--green);
+}
+
+.paste-input::placeholder {
+  color: var(--text-dim);
+}

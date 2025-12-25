@@ -9,7 +9,8 @@ function App() {
   const [myId, setMyId] = useState(null)
   const [vouches, setVouches] = useState(0)
   const [vouchersCount, setVouchersCount] = useState(0)
-  const [view, setView] = useState('home') // home, mycode, scan
+  const [view, setView] = useState('home') // home, mycode, scan, paste
+  const [pasteInput, setPasteInput] = useState('')
   const [message, setMessage] = useState('')
   const [pendingVouch, setPendingVouch] = useState(null)
   const [givenList, setGivenList] = useState([])
@@ -196,6 +197,42 @@ function App() {
     )
   }
 
+  // ===== PASTE VIEW =====
+  if (view === 'paste') {
+    const handlePaste = () => {
+      const id = extractIdFromScan(pasteInput)
+      if (id && id !== myId) {
+        setPendingVouch(id)
+        setPasteInput('')
+        setView('home')
+      } else if (id === myId) {
+        setMessage("That's your own code!")
+        setTimeout(() => setMessage(''), 2000)
+      } else {
+        setMessage("Couldn't find a valid code")
+        setTimeout(() => setMessage(''), 2000)
+      }
+    }
+    return (
+      <div className="app">
+        <button className="back-btn" onClick={() => { setView('home'); setPasteInput('') }}>← Back</button>
+        <p className="scan-instruction">Paste their link</p>
+        <input
+          className="paste-input"
+          type="text"
+          placeholder="Paste link here..."
+          value={pasteInput}
+          onChange={(e) => setPasteInput(e.target.value)}
+          autoFocus
+        />
+        <button className="big-btn green" onClick={handlePaste} style={{ marginTop: '1rem', maxWidth: '280px' }}>
+          Trust them
+        </button>
+        {message && <div className="toast">{message}</div>}
+      </div>
+    )
+  }
+
   // ===== HOME VIEW =====
   return (
     <div className="app">
@@ -220,6 +257,10 @@ function App() {
           <span className="btn-hint">Trust someone you know</span>
         </button>
       </div>
+
+      <button className="paste-link" onClick={() => setView('paste')}>
+        Have a link? Paste it
+      </button>
 
       {message && <div className="toast">{message}</div>}
 
